@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <stdoslib/stdoslib.h>
 /*Includes*/
 
 /* Typedefinations */
@@ -20,9 +21,6 @@ typedef unsigned long i64;
 #define private static
 #define packed __attribute__((packed))
 #define internal __attribute__((visibility("hidden")))
-#define copy(a,b,n) _copyn((i8*)(a),(i8*)(b),(n),1)
-#define strncopy(a,b,n) _copyn((i8*)(a),(i8*)(b),(n),0)
-#define memcopy(a,b,n) _copyn((i8*)(a),(i8*)(b),(n),1)
 #define show(x,y) _Generic((x),\
 Icmp*: show_icmp,        \
 Ip*:   show_ip,         \
@@ -39,14 +37,12 @@ Ethernet*:eval_ether\
 i64: to_mac,\
 i8*:to_macs \
 )(x)
-#define len(s) _len((i8*)s)
-#define stoi(s) _stoi((i8*)s)
+
 #define usage(x) _usage((i8*)x)
 #define MAX_PACKET_SIZE 2048
 #define SRC_ADDR "0.0.0.0"
 #define SRC_MAC "00:00:00:00:00:00"
 #define TIMEOUT (1)
-#define strcomp(a,b) _strcomp((i8*)a,(i8*)b)
 #define sendping(src,dst,mssg,len) _sendping((i8*)src,(i8*)dst,(i8*)mssg,(i16)len)
 /* MACROS */
 
@@ -54,18 +50,18 @@ i8*:to_macs \
 enum e_t{unset,e_IP = 0x0800,e_ARP=0x0806}packed;
 typedef enum e_t EtherType;
 
-public enum e_type{
+enum public e_type{
 None,
 echo,
 echo_reply,
 ICMP,
 TCP,
 UDP
-}packed;
+};
 
 typedef enum e_type Type;
 
-public struct s_rawicmp{   // 5 bytes
+struct s_rawicmp{   // 5 bytes
     i8 type;
     i8 code;
     i16 checksum;
@@ -73,7 +69,7 @@ public struct s_rawicmp{   // 5 bytes
 } packed;
 typedef struct s_rawicmp Raw_icmp;
 
-public struct s_icmp{
+struct s_icmp{
 Type type:3;
 i16 size;
 i8 *header;
@@ -81,7 +77,7 @@ i8 *header;
 
 typedef struct s_icmp Icmp;
 
-public struct s_ip{
+struct s_ip{
 i32 srcaddr;
 i32 dstaddr; 
 i16 id;
@@ -91,7 +87,7 @@ Icmp * payload;
 
 typedef struct s_ip Ip;
 
-public struct s_raw_ip{    // 20 Bytes
+struct s_raw_ip{    // 20 Bytes
 i8 ihl:4;
 i8 version:4;
 i8 dscp:6;
@@ -145,14 +141,10 @@ typedef struct s_bytestr Bytestr;
 
 /* Function Signatures */
 int main(int,char**);
-public i16 endian(i16);
 public Bytestr * eval_icmp(Icmp*);
 public void show_icmp(Icmp*,i8); 
 public void helper_ip_icmp(Icmp*,i8); 
-public void zero(i8*,i32);
 public void print_hex(void *,i32);
-public void _copy(i8 *,i8 *);
-public void _copyn(i8 *,i8 *,i16,i8);
 public i16 checksum(i8*,i16);
 public i32 ipaddr(i8*);
 public void show_ip(Ip*,i8);
@@ -172,10 +164,6 @@ public void show_ether(Ethernet*,i8);
 public Bytestr* eval_ether(Ethernet *);
 public i8 _sendping(i8*,i8*,i8*,i16);
 public void _usage(i8*);
-public i16 _len(i8*);
-public i16 _stoi(i8*);
-public i16 _pow(i16,i16);
-public i8 _strcomp(i8*,i8*);
 public void show_bs(Bytestr*,i8);
 public i32 setup_ether_sock();
 /* Function Signatures */
