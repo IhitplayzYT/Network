@@ -1,8 +1,16 @@
 #include "Networks.h"
 extern int seq,id;
-void print_hex(void *str, i32 n) {
+
+
+/**
+ * @brief Prints hex of the ptr provided
+ * @param ptr Pointer to memory location being printed
+ * @param n NO of bytes to print the hex of
+ * @return void
+ */
+void print_hex(void *ptr, i32 n) {
 i32 i, j;
-i8 *data = (i8*)str;
+i8 *data = (i8*)ptr;
 for (i = 0; i < n; i += 16) {
 for (j = 0; j < 16; j++) {
     if (i + j < n) printf("0x%02hhX ", data[i + j]);
@@ -14,6 +22,13 @@ for (j = 0; j < 16 && i + j < n; j++) {
 printf("\n");
 }}
 
+
+/**
+ * @brief Prints an ICMP packet with it's fields
+ * @param icmp The pointer to the icmp packet being printed
+ * @param df when true prints the underling payload
+ * @return void
+ */
 public void show_icmp(Icmp* icmp,i8 df){
 if (!icmp){return;}
 printf("\n---ICMP HEADER---\nType : %s\nSize : %d Bytes\n",(icmp->type == None)?"Default":(icmp->type == echo)?"Echo":(icmp->type == echo_reply)?"Echo Reply":"Invalid Type",icmp->size);
@@ -25,18 +40,37 @@ if (df) print_hex(icmp->header,icmp->size);
 printf("-------------\n\n");
 }
 
-public void show_ether(Ethernet* e,i8 l){
-printf("---Ethernet---\nPROTOCOL: %s\nSRC: %s\nDST: %s\n\n<PAYLOAD>\n",(e->protocol == 0)?"UNSET":(e->protocol == 0x08)?"IP":(e->protocol = 0x0806)?"ARP":"UNDEFINED",mac2strf(&e->src),mac2strf(&e->dst));
-if(l){show(e->payload,1);}
+/**
+ * @brief Prints an Ethernet struct with it's fields
+ * @param pkt The pointer to the ethernet struct being printed
+ * @param df when true prints the underling payload
+ * @return void
+ */
+public void show_ether(Ethernet* pkt,i8 df){
+printf("---Ethernet---\nPROTOCOL: %s\nSRC: %s\nDST: %s\n\n<PAYLOAD>\n",(pkt->protocol == 0)?"UNSET":(pkt->protocol == 0x08)?"IP":(pkt->protocol = 0x0806)?"ARP":"UNDEFINED",mac2strf(&pkt->src),mac2strf(&pkt->dst));
+if(df){show(pkt->payload,1);}
 printf("\n--------------\n");
 }
 
+/**
+ * @brief Prints the byte string struct
+ * @param bs The pointer to the Bytestring struct being printed
+ * @param flag when true prints the length
+ * @return void
+ */
 public void show_bs(Bytestr* bs,i8 flag){
 if (!bs) return;
 if (flag) printf("[%d]-",bs->len);
 printf("[%s]\n",bs->data);
 }
 
+
+/**
+ * @brief Prints the Payload of Icmp packet
+ * @param icmp The pointer to the Icmp packet being printed
+ * @param df when true prints the header in hex
+ * @return void
+ */
 public void helper_ip_icmp(Icmp* icmp,i8 df){
 if (!icmp){return;}
 printf("\n  [Payload]\n\tType : %s\n\tSize : %d Bytes\n\t",(icmp->type == None)?"Default":(icmp->type == echo)?"Echo":(icmp->type == echo_reply)?"Echo Reply":"Invalid Type",icmp->size);
@@ -48,16 +82,29 @@ if (df) print_hex(icmp->header+4,icmp->size-sizeof(Ping)-1);
 printf("-------------\n\n");
 }
 
+/**
+ * @brief Prints the Ip packet
+ * @param ip The pointer to the IP packet being printed
+ * @param flag when true prints the header in hex 
+ * @return void
+ */
 public void show_ip(Ip* ip,i8 flag){
 if (!ip) return;
 printf("\n---IP HEADER---\nID : %d\nType : %s\n[ %s ] -> [ %s ]\n   (SRC)      ->     (DST)\n",ip->id,(ip->type == TCP)?"TCP":(ip->type == UDP)?"UDP":(ip->type == ICMP)?"ICMP":"Invalid Type",ipstr(ip->srcaddr),ipstr(ip->dstaddr));
 if (ip->payload) helper_ip_icmp((Icmp*)ip->payload,flag);
-else printf("-------------\n\n");}
+else printf("-------------\n\n");
+}
 
-public i32 ipaddr(i8* s){
+
+/**
+ * @brief Converts a IP address string into 32 bit packed IPv4 integer
+ * @param ipstr The pointer to the IP packet being printed
+ * @return 32 bit integer 
+ */
+public i32 ipaddr(i8* ipstr){
 i8 a[4] = {0},*p,c = 0;
 i32 ret;
-for (p = s;*p;p++){
+for (p = ipstr;*p;p++){
 if (*p == '.' || *p == '-' || *p == ':') c++;
 else{
 a[c] *= 10;
@@ -67,6 +114,11 @@ ret = (a[3] << 24) | (a[2] << 16) | (a[1] << 8) | a[0];
 return ret;
 }
 
+/**
+ * @brief Converts a 32 bit packed IPv4 integer into an IP address string
+ * @param addr The pointer to the IP packet being printed
+ * @return IP address as a string
+ */
 public i8* ipstr(i32 addr){
 i8 *buff = (i8*)malloc(16);
 zero(buff,16);
@@ -79,29 +131,48 @@ snprintf((char*)buff, 16, "%u.%u.%u.%u", a[3], a[2], a[1], a[0]);
 return buff;
 }
 
+/**
+ * @brief Helper fxn for len [MACRO]
+ * @param str
+ * @return 16 bit unsigned length
+ */
 public i16 _len(i8* str){
 i8* p = str;
 for (;*p;p++);
 return (p - str);
 }
 
-
+/**
+ * @brief Helper fxn for usage [MACRO]
+ * @param name
+ * @return void 
+ */
 public void _usage(i8* name){
 fprintf(stderr,"Usage : %s <Dest_IP> [MSSG] [Mssg_len]\n",name);
 }
 
-public i8 hex2ascii(i8* s){
-i8 t = len(s) - 1;
+/**
+ * @brief Converts a hex string into ascii value 
+ * @param str Hex string to be converted
+ * @return i8 returns a single scii code
+ */
+public i8 hex2ascii(i8* str){
+i8 t = len(str) - 1;
 i8 ret=0,k=1;
 for (int i = t; i > -1 ;i--){
-if (s[i] >= 'A' && s[i] <= 'F'){ret += ((s[i] -'A'+10) * k);}
-else if(s[i] >= 'a' && s[i] <= 'f'){ret += ((s[i] -'a'+10) * k);}
-else{ ret += ((s[i] - '0') * k);}
+if (str[i] >= 'A' && str[i] <= 'F'){ret += ((str[i] -'A'+10) * k);}
+else if(str[i] >= 'a' && str[i] <= 'f'){ret += ((str[i] -'a'+10) * k);}
+else{ ret += ((str[i] - '0') * k);}
 k *= 16;
 }
 return ret;
 }
 
+/**
+ * @brief Converts a ascii value into a hex string
+ * @param x AScii value to be converted
+ * @return string returns the string hex representation
+ */
 public i8* ascii2hex(i8 x){
 if (!x) return (i8*)0;
 i8* ret = (i8*)malloc(3);
@@ -118,13 +189,20 @@ else ret[0] = x + '0';
 return ret;
 }
 
+/**
+ * @brief sends a ping request
+ * @param src the source ip string 
+ * @param dst the destination ip string 
+ * @param mssg the message to be transmitted in the packet
+ * @param len the length of the message to eb sent 
+ * @return i8 return 0 for success else fail 
+ */
 public i8 _sendping(i8* src,i8*dst,i8* mssg,i16 len){
-if (!*src || !*dst || !*mssg) return 1;
-
-Ping * str = init_ping((i8*)mssg,len+1,endian((i32)id),endian((i32)seq));
-seq++;
+if (!*src || !*dst || !*mssg) return 1;  //  Checking for NULL args
+Ping * str = init_ping((i8*)mssg,len+1,endian((i32)id),endian((i32)seq)); // To init the ping packet
+seq++;  // To manage the autoincrementation of the seq inorder to have unqiue IDs
 if (!str) return 2;
-Icmp *pkt = init_icmp(echo,(i8*)str,sizeof(Ping) + len+1);
+Icmp *pkt = init_icmp(echo,(i8*)str,sizeof(Ping) + len+1);   // To init the Icmp packet
 if (!pkt) return 3;
 Ip* ip = init_ip(ICMP,(i8*)src,(i8*)dst,0);
 if (!ip) return 4;
@@ -145,7 +223,11 @@ if (reply->payload) free(reply);
 return 0;
 }
 
-
+/**
+ * @brief Converts a icmp packet into a Bytestring holding the reply recieved
+ * @param icmp Pointer to the icmp packet recieved
+ * @return Pointer to the reply buffer as Bytestring
+ */
 public Bytestr* eval_icmp(Icmp* icmp){
 if (!icmp) return (Bytestr*)0;
 i8 * p;
@@ -178,6 +260,12 @@ Bytestr* bs = init_bytestr(p,size);
 return bs;
 }
 
+/**
+ * @brief Calculates the checksum of a struct of size 'size'
+ * @param str The packet/struct/arbitary pointer whose checksunm being calculated
+ * @param size The size of the packet/struct/arbitraty pointer whose checksum to be calculated
+ * @return 16 bit checksum
+ */
 public i16 checksum(i8* str,i16 size){
 i32 acc = 0;
 i16 carry,n = size,b,sum;
@@ -191,6 +279,11 @@ sum = acc & 0x0000ffff;
 return ~(sum + carry);
 }
 
+/**
+ * @brief Converts a Ip packet into a Bytestring holding the reply recieved
+ * @param ip Pointer to the Ip packet recieved
+ * @return Pointer to the reply buffer as Bytestring
+ */
 public Bytestr* eval_ip(Ip* ip){
 if (!ip) return (Bytestr*)0;
 Raw_ip raw;
@@ -228,7 +321,11 @@ Bytestr* bs = init_bytestr(k,endian(raw.len));
 return bs;
 }
 
-
+/**
+ * @brief Fuinction that recives raw bytes and parses the data to IP packet
+ * @param s The RawBytes
+ * @return IP packet Pointer
+ */
 public Ip * recv_ip(i32 s){
 if (!s) return (Ip *)0;
 i8 buff[MAX_PACKET_SIZE];
@@ -271,6 +368,12 @@ ip->payload = pv;
 return ip;
 }
 
+/**
+ * @brief Fuinction that sends the packet to the open socket 
+ * @param s The Socket where we are supposed to send to 
+ * @param ip Packet to be sent
+ * @return returns 1 for success else failure
+ */
 public int send_ip(i32 s,Ip* ip){
 if (!s || !ip) return 0;
 Bytestr * t = eval(ip);
@@ -288,6 +391,10 @@ if (ret < 0) return  0;
 return 1;
 }
 
+/**
+ * @brief Setup the socket properties to send and recive IP packets and adding a timer
+ * @return The Socket
+ */
 public i32 setup_ip_sock(){
 i32 one = 1;
 i32 s = socket(AF_INET,SOCK_RAW,1);
@@ -300,6 +407,12 @@ if (setsockopt(s,SOL_IP,IP_HDRINCL,(const void *)&one,sizeof(i32)) == -1) return
   return s;
 }
 
+/**
+ * @brief Function to show the Mac structure 
+ * @param m Pointer to Mac struct being displayed
+ * @param x To Choose between the seperator(0 -> 1.2.3.4, 1 -> 1:2:3:4)
+ * @return void
+ */
 public void show_mac(Mac * m,i8 x){
 if (x == 0){
 for (int i = 0;i < 6;i++){
@@ -318,6 +431,11 @@ printf("\n");
 }
 }
 
+/**
+ * @brief Converts Mac struct to a Formatted Mac address string 
+ * @param mac The pointer to Mac address struct
+ * @return string 
+ */
 public i8* mac2strf(Mac * mac){
 if (!mac) return (i8*)0;
 i8 * buff = (i8*)malloc(16);
@@ -333,6 +451,12 @@ if (k % 3) buff[k++] = ':';
 return buff;
 }
 
+/**
+ * @brief Converts Mac struct to a unformatted Mac address string 
+ * @param mac The pointer to Mac address struct
+ * @return string 
+ */
+
 public i8* mac2str(Mac * mac){
 if (!mac) return (i8*)0;
 i8 * ret = (i8*)malloc(20);
@@ -342,6 +466,11 @@ snprintf((char *)ret,19,"%.03hhu%.03hhu%.03hhu%.03hhu%.03hhu%.03hhu",mac->addr[0
 return ret;
 }
 
+/**
+ * @brief convert packed mac address number to mac struct
+ * @param arg packed mac address int
+ * @return pointer to a mac address struct
+ */
 public Mac * to_mac(i64 arg){
 Mac * mac = (Mac *)malloc(sizeof(Mac));
 if (!mac) return (Mac*)0;
@@ -349,6 +478,11 @@ for (int i = 0 ; i < 6 ; i++) mac->addr[0] = arg & (0x00000000000000ff << i);
 return mac;
 }
 
+/**
+ * @brief convert string mac address number to mac struct
+ * @param str String mac address int
+ * @return pointer to a mac address struct
+ */
 public Mac* to_macs(i8* str){
 if (!*str) return (Mac*)0;
 Mac * mac = (Mac *)malloc(sizeof(Mac));
@@ -366,6 +500,11 @@ if (k != 6) {return (Mac*)0;}
 return mac;
 }
 
+/**
+ * @brief Convert an Ethernet packet into Bystestr struct
+ * @param ether The ethernet packet being converted into a Bytestr
+ * @return pointer to a Bytestr struct 
+ */
 public Bytestr* eval_ether(Ethernet * ether){
 if (!ether) return (Bytestr*)0;
 Raw_Ethernet *raw;
@@ -382,6 +521,12 @@ if (!b2) {free(b1);return (Bytestr*)0;}
 return concat_bs(b1,b2);
 }
 
+/**
+ * @brief To concat/append two Bytestrings
+ * @param b1 Bytestring 1
+ * @param b2 Bytestring 2
+ * @return Pointer to New Allocated Bytestring
+ */
 public Bytestr* concat_bs(Bytestr* b1,Bytestr* b2){
 if ((!b1 && !b2) || (!b1->len && !b2->len)) return (Bytestr*)0;
 else if (!b1->len) return b2;

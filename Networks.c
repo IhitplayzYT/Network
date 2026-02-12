@@ -48,6 +48,30 @@ return 0;
 }
 */
 
+boolean ping(char * message,char * src,char * dst,int npackets,int mssg_len){
+if (!mssg_len) {
+mssg_len = len(message);
+if (!mssg_len) {return false;}
+}
+if (!npackets) {
+    npackets = 5;
+}
+if (!src || !dst || !*src || !*dst) {return false;}
+i8 c = 0;
+for (int i = 0 ; i < npackets; i++){
+i8 ret = sendping(SRC_ADDR,dst,message,mssg_len);
+if (!ret) {printf("!");c++;}
+else printf(".%d",ret);
+fflush(stdout);
+}
+if (!c) {fprintf(stderr,"\nError!\n");return -3;}
+printf("\nSuccess Rate (%d/%d) : %.02f %%\n",c,seq,(float)((float)c/5.0) * 100);
+return true;
+}
+
+
+
+
 int main(int argc,char * argv[]){
 init();
 Mac * s = mkmac((i8*)"12AF:461C:DDEF");

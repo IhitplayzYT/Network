@@ -166,10 +166,10 @@ public i8 _sendping(i8*,i8*,i8*,i16);
 public void _usage(i8*);
 public void show_bs(Bytestr*,i8);
 public i32 setup_ether_sock();
-/* Function Signatures */
 public Icmp * init_icmp(Type,i8*,i16);
 public Ip * init_ip(Type,i8*,i8*,i16);
 public Ping * init_ping(i8*,i16,i16,i16);
 public Ethernet * init_ether(Mac*,Mac*,EtherType);
 public Bytestr* init_bytestr(i8*,i16);
 public Bytestr* concat_bs(Bytestr*,Bytestr*);
+/* Function Signatures */

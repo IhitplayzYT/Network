@@ -1,5 +1,11 @@
 #include "Networks.h"
 extern i32 global_id;
+/*
+*
+*    CONTAINS CONSTRUCTORS
+*
+*/
+
 
 public Ip * init_ip(Type t,i8* s,i8* d,i16 id){
 if (!t || !s || !d ) return (Ip*)0;
