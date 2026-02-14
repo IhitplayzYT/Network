@@ -1,3 +1,9 @@
+#include <ctype.h>
+#include <netinet/in.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h>
+#include <stdoslib/stdoslib.h>
+#include <sys/socket.h>
 #include "Networks.h"
 extern int seq,id;
 
@@ -91,7 +97,7 @@ printf("-------------\n\n");
 public void show_ip(Ip* ip,i8 flag){
 if (!ip) return;
 printf("\n---IP HEADER---\nID : %d\nType : %s\n[ %s ] -> [ %s ]\n   (SRC)      ->     (DST)\n",ip->id,(ip->type == TCP)?"TCP":(ip->type == UDP)?"UDP":(ip->type == ICMP)?"ICMP":"Invalid Type",ipstr(ip->srcaddr),ipstr(ip->dstaddr));
-if (ip->payload) helper_ip_icmp((Icmp*)ip->payload,flag);
+if (ip->payload.ip_pkt) helper_ip_icmp((Icmp*)ip->payload.ip_pkt,flag);
 else printf("-------------\n\n");
 }
 
@@ -147,8 +153,11 @@ return (p - str);
  * @param name
  * @return void 
  */
-public void _usage(i8* name){
+public void usage_ip(i8* name){
 fprintf(stderr,"Usage : %s <Dest_IP> [MSSG] [Mssg_len]\n",name);
+}
+public void usage_ether(i8* name){
+fprintf(stderr,"Usage : %s <SRC_MAC> <DST_MAC> <SRC_IP> <DST_IP> <MSSG> <MSSG_LEN>\n",name);
 }
 
 /**
@@ -189,6 +198,14 @@ else ret[0] = x + '0';
 return ret;
 }
 
+public i8 _sendether(i32 sock, Ethernet * eth){
+if (!sock | !eth) return 0;
+Bytestr * bs = eval(eth);
+int ret = send(sock, bs->data, bs->len, 0);
+    return ret;
+}
+
+
 /**
  * @brief sends a ping request
  * @param src the source ip string 
@@ -206,20 +223,20 @@ Icmp *pkt = init_icmp(echo,(i8*)str,sizeof(Ping) + len+1);   // To init the Icmp
 if (!pkt) return 3;
 Ip* ip = init_ip(ICMP,(i8*)src,(i8*)dst,0);
 if (!ip) return 4;
-ip->payload = pkt;
+ip->payload.ip_pkt = pkt;
 i32 sock = setup_ip_sock();
-if (!sock) {close(sock);free(ip->payload);free(ip);return 5;}
+if (!sock) {close(sock);free(ip->payload.ip_pkt);free(ip);return 5;}
 
 int x = send_ip(sock,ip);
-if (!x){close(sock);free(ip->payload);free(ip);return 6;}
+if (!x){close(sock);free(ip->payload.ip_pkt);free(ip);return 6;}
 Ip* reply = recv_ip(sock);
 if (!reply){
-    close(sock);free(ip->payload);free(ip);free(reply);return 7;}
+    close(sock);free(ip->payload.ip_pkt);free(ip);free(reply);return 7;}
 close(sock);
-free(ip->payload);
+free(ip->payload.ip_pkt);
 free(ip);
-if (reply->payload && reply->payload->header)free(reply->payload);
-if (reply->payload) free(reply);
+if (reply->payload.ip_pkt && reply->payload.ip_pkt->header)free(reply->payload.ip_pkt);
+if (reply->payload.ip_pkt) free(reply);
 return 0;
 }
 
@@ -286,17 +303,18 @@ return ~(sum + carry);
  */
 public Bytestr* eval_ip(Ip* ip){
 if (!ip) return (Bytestr*)0;
+
 Raw_ip raw;
 raw.version = 4;
 raw.ihl = (sizeof(Raw_ip))/4;
 raw.dscp = 0;
 raw.ecn = 0;
-raw.len = (ip->payload)? endian(sizeof(Raw_ip) + ip->payload->size + sizeof(Raw_icmp)):endian(sizeof(Raw_ip));
+raw.len = endian(sizeof(Raw_ip) + (ip->payload.raw_pkt ? ((ip->type == ICMP) ? ip->payload.ip_pkt->size + sizeof(Raw_icmp) : len(ip->payload.raw_pkt)) : 0)) ;
 raw.id = endian(ip->id);
 raw.flags = 0;
 raw.frag_offset= 0;
 raw.ttl = 250;
-raw.protocol = (ip->type == ICMP)?1:0;
+raw.protocol = (ip->type == ICMP)?1:(ip->type == Raw)?0:-1;
 raw.checksum = 0;
 raw.srcaddr = ip->srcaddr;
 raw.dstaddr = ip->dstaddr;
@@ -306,13 +324,12 @@ i8* k = p;
 zero(p,raw.len);
 memcopy(p,&raw,sizeof(Raw_ip));
 p+=sizeof(Raw_ip);
-if (ip->payload && ip->payload->size){
-    Bytestr* bs = eval((Icmp*)ip->payload);
-    i8* k = bs->data;
-    i16 l = bs->len;
-    if (k){copy(p,k,l);}
+if (ip->payload.raw_pkt){
+    Bytestr* bs = (ip->type ==  ICMP) ? eval((Icmp*)ip->payload.ip_pkt):eval((i8 *)ip->payload.raw_pkt);
+    if (bs) {
+    if (k) copy(p,bs->data,bs->len);
     free(bs);
-    free(k);
+    }
 }
 Raw_ip * rawp;
 rawp = (Raw_ip*)k;
@@ -343,7 +360,7 @@ if (kind != ICMP){fprintf(stderr,"Unsupported Packet Type\n");return (Ip*)0;}
 Ip* ip = init_ip(kind,ipstr(raw->srcaddr),ipstr(raw->dstaddr),id);
 if (!ip) return (Ip *)0;
 n -= sizeof(Raw_ip);
-if (!n){ip->payload = (Icmp*)0;return ip;}
+if (!n){ip->payload.ip_pkt = (Icmp*)0;return ip;}
 
 rawicmp = (Raw_icmp*)(buff+sizeof(Raw_ip));
 Ping * ping;
@@ -363,7 +380,7 @@ zero((i8*)ping,n);
 memcopy(ping,rawicmp->header,n);
 Icmp * pv = init_icmp(t,(i8*)ping,n);
 if (!pv) return (Ip *)0;
-ip->payload = pv;
+ip->payload.ip_pkt = pv;
 
 return ip;
 }
@@ -403,9 +420,27 @@ struct timeval t;
 t.tv_sec = TIMEOUT;
 t.tv_usec = 0;
 if (setsockopt(s,SOL_IP,IP_HDRINCL,(const void *)&one,sizeof(i32)) == -1) return 0;
- if (setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t)) == -1) {close(s);return 0;}
+if (setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t)) == -1) {close(s);return 0;}
   return s;
 }
+
+/**
+ * @brief Setup the socket properties to send and recive Ethernet packets and adding a timer
+ * @return The Socket
+ */
+public i32 setup_ether_sock(){
+struct timeval t;
+t.tv_sec =  TIMEOUT;
+t.tv_usec = 0;
+i32 one = 1;
+int s = socket(AF_PACKET,SOCK_RAW,htons(ETH_P_ALL));
+if (s==-1) return 0;
+
+if (setsockopt(s,SOL_IP,IP_HDRINCL,(const void *)&one,sizeof(i32)) == -1) return 0;
+if (setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t)) == -1) {close(s);return 0;}
+return s;
+}
+
 
 /**
  * @brief Function to show the Mac structure 
@@ -486,17 +521,37 @@ return mac;
 public Mac* to_macs(i8* str){
 if (!*str) return (Mac*)0;
 Mac * mac = (Mac *)malloc(sizeof(Mac));
-i8 k = 0,j = 0;
-i8 buff[3] = {0};
 if (!mac) return (Mac*)0;
-for (int i = 0 ;str[i];i++){
-if (str[i] == ':' || str[i] == '.') continue;
-buff[j++] = str[i];
-if (j == 2){
-mac->addr[k++] = hex2ascii(buff);
-j = buff[0] = buff[1] = buff[2] = 0;}
+char delim = (freq(str,(i8)'.') == 0)?':':'.';
+struct s_Tok_ret *tokens= tokenise(str, delim);
+if (tokens->n == 6) {
+for (int i = 0 ; i < tokens->n;i++) {
+mac->addr[i] = str2hex(tokens->ret[i]);
 }
-if (k != 6) {return (Mac*)0;}
+}
+else if (tokens->n == 3) {
+// 1234:2345:2345
+for (int i = 0 ; i < tokens->n;i++) {
+i8 * first = NULL;
+strncopy(first, tokens->ret[i], 2);
+mac->addr[2 * i] = str2hex(first);
+mac->addr[2 * i + 1] = str2hex(tokens->ret[i]+2);
+}
+}else{
+    free(mac);
+    return 0;
+}
+//i8 k = 0,j = 0;
+//i8 buff[3] = {0};
+//for (int i = 0 ;str[i];i++){
+//if (str[i] == ':' || str[i] == '.') continue;
+//buff[j++] = str[i];
+//if (j == 2){
+//mac->addr[k++] = hex2ascii(buff);
+//j = buff[0] = buff[1] = buff[2] = 0;}
+//}
+//if (k != 6) {return (Mac*)0;}
+free(tokens);
 return mac;
 }
 
@@ -541,4 +596,36 @@ free(b1);
 free(b2);
 return bs;
 }
+}
+
+void freeall(void * first,...){
+va_list args;
+va_start(args, first);
+void * ptr = first;
+while (ptr){
+    free(ptr);
+    ptr = va_arg(args, void *);
+}
+va_end(args);
+}
+
+Bytestr * eval_raw(i8 * raw) {
+    return init_bytestr(raw, len(raw));
+}
+
+public i8 str2hex(i8 * str) {
+int l = len(str);
+i8 ret=0;
+if (l > 2 ) return -1;
+for (int i = 0 ; i < l ; i++) {
+    if (str[i] >= '0' && str[i] <= '9'){
+        ret += str[i]-'0';
+    }
+    else{
+        char lwr = tolower(str[i]);
+        ret += (lwr >= 'a' && lwr <= 'z') ? lwr - 'a': 0;
+    }
+
+}
+return ret;
 }

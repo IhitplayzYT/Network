@@ -1,10 +1,17 @@
 /* Networks.c */
 #include "Networks.h"
+#include <bits/types/struct_timeval.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdoslib/stdoslib.h>
+#include <unistd.h>
 
 i16 global_id;
 i16 seq,id;
 
 void init() {
+if (getuid()) {fprintf(stdout,"Run with sudo");exit(-10);}
 srand(getpid());
 global_id = rand() % 50000;
 seq = 0;
@@ -15,9 +22,9 @@ id = rand() % 50000;
 int main(int argc,char * argv[]) { 
 i16 count = 5,l;
 i8* dst,*mssg;
-if (argc < 2) {usage(argv[0]);return -1;}
+if (argc < 2) {usage_ip(argv[0]);return -1;}
 else if (argc == 2) {
-if (strcomp(argv[1],"-h")==0 || strcomp(argv[1],"-help")==0 ){usage(argv[0]);return -1;}
+if (strcomp(argv[1],"-h")==0 || strcomp(argv[1],"-help")==0 ){usage_ip(argv[0]);return -1;}
 dst = (i8*)argv[1];
 mssg = (i8*)"Hello";
 l = 5;
@@ -32,7 +39,7 @@ dst = (i8*)argv[1];
 mssg = (i8*)argv[2];
 l = stoi((i8*)argv[3]);
 }
-else {usage(argv[0]);return -1;}
+else {usage_ip(argv[0]);return -1;}
 printf("Sending 5 packets of %d bytes ICMP echoes to %s | Timeout = %ds\n",l,dst,TIMEOUT);
 i8 c = 0;
 if (l > 225){printf("Mssg To Big!!\n");return -2;}
@@ -74,25 +81,41 @@ return true;
 
 int main(int argc,char * argv[]){
 init();
-Mac * s = mkmac((i8*)"12AF:461C:DDEF");
-Mac * d = mkmac((i8*)"1ade:3832:def9");
-Ethernet * ether = init_ether(s,d,e_ARP);
-Ping * str = init_ping((i8*)"helloworld",9,endian(id),endian(seq));
-seq++;
-if (!str) return 2;
-Icmp *pkt = init_icmp(echo,(i8*)str,sizeof(Ping) + 9);
-if (!pkt) return 3;
-Ip* ip = init_ip(ICMP,(i8*)SRC_ADDR,(i8*)"1.1.1.1",0);
-if (!ip) return 4;
-ip->payload = pkt;
-ether->payload = ip;
-show(ether,1);
+if (argc < 6) {
+    usage_ether((i8 *)argv[0]);
+    return -1;
+}
+// "Usage : %s <SRC_MAC> <DST_MAC> <SRC_IP> <DST_IP> <MSSG> <MSSG_LEN>
+Mac * src = mkmac((i8*)argv[1]),* dst = mkmac((i8*)argv[2]);
+if (!src || !dst) return -2;
+char * ip_src = argv[3],* ip_dst = argv[4];
+if (!ip_src || !ip_dst) return -3;
+char * mssg = argv[5];
+i16 mssg_len = len(mssg);
+if (argc > 6) mssg_len = stoi(argv[6]);
+if (!mssg_len) return -4;
+printf("1");
+i32 sock = setup_ether_sock();
+printf("2");
+if (!sock) return -5;
 
-free(pkt);
-free(ip);
-free(s);
-free(d);
-free(ether);
+int id = 0;
+
+Ethernet * ether = init_ether(src,dst,e_IP);
+if (!ether) return -6;
+Ip * ip = init_ip(Raw, (i8 *)ip_src, (i8 *)ip_dst, id);
+id++;
+if (!ip) return -7;
+ether->payload = ip;
+ip->payload.raw_pkt = (i8* )mssg;
+i8 ret = _sendether(sock, ether);
+printf("Ok = %d\n",ret);
+
+seq++;
+
+
+close(sock);
+FREE(ip,src,dst,ether);
 return 0;
 }
 
@@ -100,9 +123,4 @@ return 0;
 
 
 
-public i32 setup_ether_sock(){
-i32 s = socket(AF_PACKET,SOCK_PACKET,1);
-if (s==-1) return 0;
 
-return s;
-}

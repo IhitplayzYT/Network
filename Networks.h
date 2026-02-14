@@ -31,19 +31,21 @@ Bytestr*:show_bs \
 #define eval(x) _Generic((x),\
 Ip*:eval_ip,\
 Icmp*:eval_icmp,\
-Ethernet*:eval_ether\
+Ethernet*:eval_ether,\
+i8 *:eval_raw\
 )(x)
 #define mkmac(x) _Generic((x),\
 i64: to_mac,\
-i8*:to_macs \
+i8*: to_macs \
 )(x)
-
-#define usage(x) _usage((i8*)x)
+#define FREE(...) freeall(__VA_ARGS__,NULL)
+//#define usage(x) _usage((i8*)x)
 #define MAX_PACKET_SIZE 2048
 #define SRC_ADDR "0.0.0.0"
 #define SRC_MAC "00:00:00:00:00:00"
 #define TIMEOUT (1)
 #define sendping(src,dst,mssg,len) _sendping((i8*)src,(i8*)dst,(i8*)mssg,(i16)len)
+#define sendether () _sendether()
 /* MACROS */
 
 /* Definations */
@@ -56,7 +58,8 @@ echo,
 echo_reply,
 ICMP,
 TCP,
-UDP
+UDP,
+Raw
 };
 
 typedef enum e_type Type;
@@ -77,13 +80,22 @@ i8 *header;
 
 typedef struct s_icmp Icmp;
 
+union layer{
+    Icmp * ip_pkt;
+    i8 * raw_pkt;
+};
+typedef union layer Layer;
+
 struct s_ip{
 i32 srcaddr;
 i32 dstaddr; 
 i16 id;
 Type type:3;
-Icmp * payload;
+Layer payload;
 }packed;
+
+
+
 
 typedef struct s_ip Ip;
 
@@ -163,13 +175,20 @@ public i8* mac2str(Mac *);
 public void show_ether(Ethernet*,i8);
 public Bytestr* eval_ether(Ethernet *);
 public i8 _sendping(i8*,i8*,i8*,i16);
-public void _usage(i8*);
+public void usage_ip(i8* );
+public void usage_ether(i8* );
 public void show_bs(Bytestr*,i8);
 public i32 setup_ether_sock();
 public Icmp * init_icmp(Type,i8*,i16);
 public Ip * init_ip(Type,i8*,i8*,i16);
+public i32 ipaddr(i8* );
 public Ping * init_ping(i8*,i16,i16,i16);
 public Ethernet * init_ether(Mac*,Mac*,EtherType);
 public Bytestr* init_bytestr(i8*,i16);
+public i32 ipaddr(i8* );
 public Bytestr* concat_bs(Bytestr*,Bytestr*);
+public void freeall(void *,...);
+public i8 _sendether(i32,Ethernet * );
+public Bytestr * eval_raw(i8 *);
+public i8 str2hex(i8 * );
 /* Function Signatures */

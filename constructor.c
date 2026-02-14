@@ -15,7 +15,7 @@ ip->id = (!id)? global_id++:id;
 ip->type = t;
 ip->srcaddr = ipaddr(s);
 ip->dstaddr = ipaddr(d);
-ip->payload = (Icmp*)0;
+ip->payload.ip_pkt = (Icmp*)0;
 if (!ip->dstaddr){free(ip);return (Ip*)0;}
 return ip;
 }
