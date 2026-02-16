@@ -188,7 +188,8 @@ public Bytestr* init_bytestr(i8*,i16);
 public i32 ipaddr(i8* );
 public Bytestr* concat_bs(Bytestr*,Bytestr*);
 public void freeall(void *,...);
-public i8 _sendether(i32,Ethernet * );
+public int _sendether(i32,Ethernet * );
 public Bytestr * eval_raw(i8 *);
 public i8 str2hex(i8 * );
+i8 hexval(char c);
 /* Function Signatures */

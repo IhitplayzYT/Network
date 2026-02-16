@@ -87,6 +87,7 @@ if (argc < 6) {
 }
 // "Usage : %s <SRC_MAC> <DST_MAC> <SRC_IP> <DST_IP> <MSSG> <MSSG_LEN>
 Mac * src = mkmac((i8*)argv[1]),* dst = mkmac((i8*)argv[2]);
+show_mac(src, 1);
 if (!src || !dst) return -2;
 char * ip_src = argv[3],* ip_dst = argv[4];
 if (!ip_src || !ip_dst) return -3;
@@ -94,15 +95,14 @@ char * mssg = argv[5];
 i16 mssg_len = len(mssg);
 if (argc > 6) mssg_len = stoi(argv[6]);
 if (!mssg_len) return -4;
-printf("1");
 i32 sock = setup_ether_sock();
-printf("2");
 if (!sock) return -5;
 
 int id = 0;
 
 Ethernet * ether = init_ether(src,dst,e_IP);
 if (!ether) return -6;
+show_ether(ether, 1);
 Ip * ip = init_ip(Raw, (i8 *)ip_src, (i8 *)ip_dst, id);
 id++;
 if (!ip) return -7;

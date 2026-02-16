@@ -198,10 +198,12 @@ else ret[0] = x + '0';
 return ret;
 }
 
-public i8 _sendether(i32 sock, Ethernet * eth){
+public int _sendether(i32 sock, Ethernet * eth){
 if (!sock | !eth) return 0;
 Bytestr * bs = eval(eth);
+if (!bs) return 0;
 int ret = send(sock, bs->data, bs->len, 0);
+printf("z\n");
     return ret;
 }
 
@@ -435,8 +437,7 @@ t.tv_usec = 0;
 i32 one = 1;
 int s = socket(AF_PACKET,SOCK_RAW,htons(ETH_P_ALL));
 if (s==-1) return 0;
-
-if (setsockopt(s,SOL_IP,IP_HDRINCL,(const void *)&one,sizeof(i32)) == -1) return 0;
+//if (setsockopt(s,SOL_IP,IP_HDRINCL,(const void *)&one,sizeof(i32)) == -1) return 0;
 if (setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t)) == -1) {close(s);return 0;}
 return s;
 }
@@ -522,12 +523,15 @@ public Mac* to_macs(i8* str){
 if (!*str) return (Mac*)0;
 Mac * mac = (Mac *)malloc(sizeof(Mac));
 if (!mac) return (Mac*)0;
-char delim = (freq(str,(i8)'.') == 0)?':':'.';
+
+char delim = (freq(str,(i8)'.') == 0) ? ':' : '.';
 struct s_Tok_ret *tokens= tokenise(str, delim);
 if (tokens->n == 6) {
 for (int i = 0 ; i < tokens->n;i++) {
 mac->addr[i] = str2hex(tokens->ret[i]);
+printf("%x %s\n",mac->addr[i],tokens->ret[i]);
 }
+
 }
 else if (tokens->n == 3) {
 // 1234:2345:2345
@@ -563,13 +567,16 @@ return mac;
 public Bytestr* eval_ether(Ethernet * ether){
 if (!ether) return (Bytestr*)0;
 Raw_Ethernet *raw;
+show_ether(ether,1);
 i8* ret = (i8*)malloc(sizeof(Raw_Ethernet));
 if (!ret) return (Bytestr*)0;
 raw = (Raw_Ethernet*)ret;
+print_hex(ether, sizeof(Ethernet));
 raw->dst = ether->dst;
 raw->src = ether->src;
 raw->ethtype = ether->protocol;
-Bytestr *b1 = init_bytestr(ret,sizeof(Raw_Ethernet));
+print_hex(raw, sizeof(Raw_Ethernet));
+Bytestr *b1 = init_bytestr((i8*)raw,sizeof(Raw_Ethernet));
 if (!ether->payload) return b1;
 Bytestr * b2 = eval(ether->payload);
 if (!b2) {free(b1);return (Bytestr*)0;}
@@ -613,19 +620,25 @@ Bytestr * eval_raw(i8 * raw) {
     return init_bytestr(raw, len(raw));
 }
 
-public i8 str2hex(i8 * str) {
-int l = len(str);
-i8 ret=0;
-if (l > 2 ) return -1;
-for (int i = 0 ; i < l ; i++) {
-    if (str[i] >= '0' && str[i] <= '9'){
-        ret += str[i]-'0';
-    }
-    else{
-        char lwr = tolower(str[i]);
-        ret += (lwr >= 'a' && lwr <= 'z') ? lwr - 'a': 0;
-    }
-
+i8 hexval(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    c = tolower(c);
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return 255;
 }
-return ret;
+
+public i8 str2hex(i8 *str)
+{
+    int l = len(str);
+    if (l == 0 || l > 2) return 255;
+    i8 high = 0;
+    i8 low  = 0;
+    if (l == 2) {
+        high = hexval(str[0]);
+        low  = hexval(str[1]);
+    } else low = hexval(str[0]);
+    
+    if (high == 255 || low == 255) return 255;
+    return (high << 4) | low;
 }
