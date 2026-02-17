@@ -2,6 +2,7 @@
 #include <netinet/in.h>
 #include <linux/if_packet.h>
 #include <net/ethernet.h>
+#include <stdio.h>
 #include <stdoslib/stdoslib.h>
 #include <sys/socket.h>
 #include "Networks.h"
@@ -54,7 +55,7 @@ printf("-------------\n\n");
  */
 public void show_ether(Ethernet* pkt,i8 df){
 printf("---Ethernet---\nPROTOCOL: %s\nSRC: %s\nDST: %s\n\n<PAYLOAD>\n",(pkt->protocol == 0)?"UNSET":(pkt->protocol == 0x08)?"IP":(pkt->protocol = 0x0806)?"ARP":"UNDEFINED",mac2strf(&pkt->src),mac2strf(&pkt->dst));
-if(df){show(pkt->payload,1);}
+if(df && pkt->payload->type == ICMP){show_ip(pkt->payload,1);}
 printf("\n--------------\n");
 }
 
@@ -96,7 +97,7 @@ printf("-------------\n\n");
  */
 public void show_ip(Ip* ip,i8 flag){
 if (!ip) return;
-printf("\n---IP HEADER---\nID : %d\nType : %s\n[ %s ] -> [ %s ]\n   (SRC)      ->     (DST)\n",ip->id,(ip->type == TCP)?"TCP":(ip->type == UDP)?"UDP":(ip->type == ICMP)?"ICMP":"Invalid Type",ipstr(ip->srcaddr),ipstr(ip->dstaddr));
+printf("\n---IP HEADER---\nID : %d\nType : %s\n[ %s ] -> [ %s ]\n   (SRC)      ->     (DST)\n",ip->id,(ip->type == TCP)?"TCP":(ip->type == UDP)?"UDP":(ip->type == ICMP)?"ICMP":(ip->type == Raw)?"Raw":(ip->type == echo)?"Echo":(ip->type = echo_reply)?"Echo Reply":"None",ipstr(ip->srcaddr),ipstr(ip->dstaddr));
 if (ip->payload.ip_pkt) helper_ip_icmp((Icmp*)ip->payload.ip_pkt,flag);
 else printf("-------------\n\n");
 }
@@ -200,10 +201,9 @@ return ret;
 
 public int _sendether(i32 sock, Ethernet * eth){
 if (!sock | !eth) return 0;
-Bytestr * bs = eval(eth);
+/*FIXME: Issue in this*/Bytestr * bs = eval(eth);
 if (!bs) return 0;
 int ret = send(sock, bs->data, bs->len, 0);
-printf("z\n");
     return ret;
 }
 
@@ -305,13 +305,11 @@ return ~(sum + carry);
  */
 public Bytestr* eval_ip(Ip* ip){
 if (!ip) return (Bytestr*)0;
-
 Raw_ip raw;
 raw.version = 4;
 raw.ihl = (sizeof(Raw_ip))/4;
 raw.dscp = 0;
 raw.ecn = 0;
-raw.len = endian(sizeof(Raw_ip) + (ip->payload.raw_pkt ? ((ip->type == ICMP) ? ip->payload.ip_pkt->size + sizeof(Raw_icmp) : len(ip->payload.raw_pkt)) : 0)) ;
 raw.id = endian(ip->id);
 raw.flags = 0;
 raw.frag_offset= 0;
@@ -320,24 +318,35 @@ raw.protocol = (ip->type == ICMP)?1:(ip->type == Raw)?0:-1;
 raw.checksum = 0;
 raw.srcaddr = ip->srcaddr;
 raw.dstaddr = ip->dstaddr;
-i8 * p = (i8*)malloc(raw.len);
+i16 lene = 0,lenb;
+if (ip->payload.raw_pkt) {
+    lene = raw.ihl * 4 + ((ip->type == ICMP) ? (sizeof(Raw_icmp) + ip->payload.ip_pkt->size) : (len(ip->payload.raw_pkt)) );
+    lenb = endian16(lene);
+    raw.len = lenb;
+}
+else lene = raw.len = raw.ihl * 4;
+
+if (lene%2) lene++;
+
+i8 * p = (i8*)malloc(lene);
 if (!p) return (Bytestr*)0;
-i8* k = p;
-zero(p,raw.len);
+i8* ret = p;
+zero(p,lene);
 memcopy(p,&raw,sizeof(Raw_ip));
 p+=sizeof(Raw_ip);
+
 if (ip->payload.raw_pkt){
-    Bytestr* bs = (ip->type ==  ICMP) ? eval((Icmp*)ip->payload.ip_pkt):eval((i8 *)ip->payload.raw_pkt);
+    Bytestr* bs = (ip->type ==  ICMP) ? eval(ip->payload.ip_pkt):eval((i8 *)ip->payload.raw_pkt);
     if (bs) {
-    if (k) copy(p,bs->data,bs->len);
+    copy(p,bs->data,bs->len);
     free(bs);
     }
 }
 Raw_ip * rawp;
-rawp = (Raw_ip*)k;
-rawp->checksum = endian(checksum(p,endian(raw.len)));
-Bytestr* bs = init_bytestr(k,endian(raw.len));
-return bs;
+rawp = (Raw_ip*)ret;
+rawp->checksum = checksum(ret,lene);
+Bytestr * returnme = init_bytestr(ret,lene);
+return returnme;
 }
 
 /**
@@ -529,7 +538,6 @@ struct s_Tok_ret *tokens= tokenise(str, delim);
 if (tokens->n == 6) {
 for (int i = 0 ; i < tokens->n;i++) {
 mac->addr[i] = str2hex(tokens->ret[i]);
-printf("%x %s\n",mac->addr[i],tokens->ret[i]);
 }
 
 }
@@ -567,19 +575,17 @@ return mac;
 public Bytestr* eval_ether(Ethernet * ether){
 if (!ether) return (Bytestr*)0;
 Raw_Ethernet *raw;
-show_ether(ether,1);
 i8* ret = (i8*)malloc(sizeof(Raw_Ethernet));
 if (!ret) return (Bytestr*)0;
 raw = (Raw_Ethernet*)ret;
-print_hex(ether, sizeof(Ethernet));
 raw->dst = ether->dst;
 raw->src = ether->src;
 raw->ethtype = ether->protocol;
-print_hex(raw, sizeof(Raw_Ethernet));
+
 Bytestr *b1 = init_bytestr((i8*)raw,sizeof(Raw_Ethernet));
 if (!ether->payload) return b1;
 Bytestr * b2 = eval(ether->payload);
-if (!b2) {free(b1);return (Bytestr*)0;}
+if (!b2) {free(b1->data);free(b1);return (Bytestr*)0;}
 return concat_bs(b1,b2);
 }
 

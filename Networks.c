@@ -87,7 +87,6 @@ if (argc < 6) {
 }
 // "Usage : %s <SRC_MAC> <DST_MAC> <SRC_IP> <DST_IP> <MSSG> <MSSG_LEN>
 Mac * src = mkmac((i8*)argv[1]),* dst = mkmac((i8*)argv[2]);
-show_mac(src, 1);
 if (!src || !dst) return -2;
 char * ip_src = argv[3],* ip_dst = argv[4];
 if (!ip_src || !ip_dst) return -3;
@@ -97,17 +96,17 @@ if (argc > 6) mssg_len = stoi(argv[6]);
 if (!mssg_len) return -4;
 i32 sock = setup_ether_sock();
 if (!sock) return -5;
-
 int id = 0;
-
 Ethernet * ether = init_ether(src,dst,e_IP);
 if (!ether) return -6;
-show_ether(ether, 1);
 Ip * ip = init_ip(Raw, (i8 *)ip_src, (i8 *)ip_dst, id);
-id++;
 if (!ip) return -7;
+id++;
 ether->payload = ip;
-ip->payload.raw_pkt = (i8* )mssg;
+ether->payload->payload.raw_pkt = (i8* )mssg;
+
+
+// No issues in ethernet struct atleast
 i8 ret = _sendether(sock, ether);
 printf("Ok = %d\n",ret);
 

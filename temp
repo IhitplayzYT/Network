@@ -1,0 +1,41 @@
+    lengthle = 0;
+    if (pkt->payload.rawpkt) {
+        lengthle = (rawpkt.ihl*4)
+            + (pkt->kind == L4icmp) ?
+                    sizeof(struct s_rawicmp)
+                    + pkt->payload.icmppkt->size :
+                stringlen($1 pkt->payload.rawpkt);
+        lengthbe = endian16(lengthle);
+        rawpkt.length = lengthbe;
+    }
+    else
+        lengthle = rawpkt.length = (rawpkt.ihl*4);
+
+    if (lengthle%2)
+        lengthle++;
+    
+    size = sizeof(struct s_rawip);
+    p = $1 malloc($i lengthle);
+    ret = p;
+    zero(p, lengthle);
+    copy(p, $1 &rawpkt, size);
+    p += size;
+
+    if (pkt->payload.rawpkt) {
+        // size = (sizeof(struct s_rawicmp) +
+        //     pkt->payload->size);
+        bs = (pkt->kind == L4icmp) ?
+                eval(pkt->payload.icmppkt) :
+            eval(pkt->payload.rawpkt);
+        if (bs) {
+            copy(p, bs->data, bs->size);
+            free(bs);
+        }
+    }
+
+    check = checksum(ret, lengthle);
+    rawptr = (struct s_rawip *)ret;
+    rawptr->checksum = check;
+
+    return mkbytestring(ret, lengthle);
+}
