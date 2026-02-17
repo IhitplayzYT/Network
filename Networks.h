@@ -7,6 +7,9 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <stdoslib/stdoslib.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+#include <sys/types.h>
 /*Includes*/
 
 /* Typedefinations */
@@ -21,6 +24,7 @@ typedef unsigned long i64;
 #define private static
 #define packed __attribute__((packed))
 #define internal __attribute__((visibility("hidden")))
+#define SRC
 #define show(x,y) _Generic((x),\
 Icmp*: show_icmp,        \
 Ip*:   show_ip,         \
@@ -178,7 +182,7 @@ public i8 _sendping(i8*,i8*,i8*,i16);
 public void usage_ip(i8* );
 public void usage_ether(i8* );
 public void show_bs(Bytestr*,i8);
-public i32 setup_ether_sock();
+public i32 setup_ether_sock(i8 *,Mac*);
 public Icmp * init_icmp(Type,i8*,i16);
 public Ip * init_ip(Type,i8*,i8*,i16);
 public i32 ipaddr(i8* );
@@ -191,5 +195,6 @@ public void freeall(void *,...);
 public int _sendether(i32,Ethernet * );
 public Bytestr * eval_raw(i8 *);
 public i8 str2hex(i8 * );
+public i16 iftoidx(i8 *);
 i8 hexval(char c);
 /* Function Signatures */

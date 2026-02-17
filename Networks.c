@@ -81,22 +81,26 @@ return true;
 
 int main(int argc,char * argv[]){
 init();
-if (argc < 6) {
+if (argc < 7) {
     usage_ether((i8 *)argv[0]);
     return -1;
 }
 // "Usage : %s <SRC_MAC> <DST_MAC> <SRC_IP> <DST_IP> <MSSG> <MSSG_LEN>
-Mac * src = mkmac((i8*)argv[1]),* dst = mkmac((i8*)argv[2]);
+i8 * interface = (i8 *)argv[1];
+if (!interface) return -9;
+Mac * src = mkmac((i8*)argv[2]),* dst = mkmac((i8*)argv[3]);
 if (!src || !dst) return -2;
-char * ip_src = argv[3],* ip_dst = argv[4];
+char * ip_src = argv[4],* ip_dst = argv[5];
 if (!ip_src || !ip_dst) return -3;
-char * mssg = argv[5];
+char * mssg = argv[6];
 i16 mssg_len = len(mssg);
-if (argc > 6) mssg_len = stoi(argv[6]);
+if (argc > 6) mssg_len = stoi(argv[7]);
 if (!mssg_len) return -4;
-i32 sock = setup_ether_sock();
+i32 sock = setup_ether_sock(interface,src);
+printf("bye\n");
 if (!sock) return -5;
 int id = 0;
+printf("bye\n");
 Ethernet * ether = init_ether(src,dst,e_IP);
 if (!ether) return -6;
 Ip * ip = init_ip(Raw, (i8 *)ip_src, (i8 *)ip_dst, id);
@@ -104,7 +108,7 @@ if (!ip) return -7;
 id++;
 ether->payload = ip;
 ether->payload->payload.raw_pkt = (i8* )mssg;
-
+printf("hello\n");
 
 // No issues in ethernet struct atleast
 i8 ret = _sendether(sock, ether);

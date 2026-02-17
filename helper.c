@@ -1,4 +1,6 @@
 #include <ctype.h>
+#include <ifaddrs.h>
+#include <linux/if_ether.h>
 #include <netinet/in.h>
 #include <linux/if_packet.h>
 #include <net/ethernet.h>
@@ -158,7 +160,7 @@ public void usage_ip(i8* name){
 fprintf(stderr,"Usage : %s <Dest_IP> [MSSG] [Mssg_len]\n",name);
 }
 public void usage_ether(i8* name){
-fprintf(stderr,"Usage : %s <SRC_MAC> <DST_MAC> <SRC_IP> <DST_IP> <MSSG> <MSSG_LEN>\n",name);
+fprintf(stderr,"Usage : %s <INTERFACE> <SRC_MAC> <DST_MAC> <SRC_IP> <DST_IP> <MSSG> <MSSG_LEN>\n",name);
 }
 
 /**
@@ -204,7 +206,7 @@ if (!sock | !eth) return 0;
 /*FIXME: Issue in this*/Bytestr * bs = eval(eth);
 if (!bs) return 0;
 int ret = send(sock, bs->data, bs->len, 0);
-    return ret;
+return ret;
 }
 
 
@@ -323,13 +325,13 @@ if (ip->payload.raw_pkt) {
     lene = raw.ihl * 4 + ((ip->type == ICMP) ? (sizeof(Raw_icmp) + ip->payload.ip_pkt->size) : (len(ip->payload.raw_pkt)) );
     lenb = endian16(lene);
     raw.len = lenb;
+    printf("\n%d %d %d %d %d\n",raw.ihl*4,lene,lenb,len(ip->payload.raw_pkt),raw.len);
 }
 else lene = raw.len = raw.ihl * 4;
 
 if (lene%2) lene++;
 
 i8 * p = (i8*)malloc(lene);
-if (!p) return (Bytestr*)0;
 i8* ret = p;
 zero(p,lene);
 memcopy(p,&raw,sizeof(Raw_ip));
@@ -345,7 +347,9 @@ if (ip->payload.raw_pkt){
 Raw_ip * rawp;
 rawp = (Raw_ip*)ret;
 rawp->checksum = checksum(ret,lene);
+printf("%d\n",lene);
 Bytestr * returnme = init_bytestr(ret,lene);
+show(returnme,1);
 return returnme;
 }
 
@@ -435,19 +439,50 @@ if (setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t)) == -1) {close(s);return 0;
   return s;
 }
 
+
+public i16 iftoidx(i8 * interface){
+struct ifaddrs * head,* p;
+int idx = 0;
+int ret = getifaddrs(&head);
+if (!ret) return 0;
+boolean flag = 0;
+
+for (p = head,idx=1;p;p = p->ifa_next,idx++){
+    if (strcomp(p->ifa_name, interface)){
+         flag = 1;
+         break;
+    }
+}
+freeifaddrs(head);
+return (!flag) ? 0 : idx;
+}
+
+
 /**
  * @brief Setup the socket properties to send and recive Ethernet packets and adding a timer
  * @return The Socket
  */
-public i32 setup_ether_sock(){
+public i32 setup_ether_sock(i8 * interface,Mac *srcmac){
 struct timeval t;
+struct sockaddr_ll sock;
 t.tv_sec =  TIMEOUT;
 t.tv_usec = 0;
-i32 one = 1;
+zero(&sock,sizeof(struct sockaddr_ll));
+sock.sll_family = AF_PACKET;
+sock.sll_protocol = htons(ETH_P_ALL); 
+sock.sll_ifindex = (int)iftoidx(interface);
+printf("imp=%d\n",sock.sll_ifindex);
+sock.sll_halen = 6;
+memcopy(&sock.sll_addr,srcmac,6);
 int s = socket(AF_PACKET,SOCK_RAW,htons(ETH_P_ALL));
 if (s==-1) return 0;
+/*FIXME: */s = bind(s, (struct sockaddr *)&sock, sizeof(struct sockaddr_ll));
+if (s < 0 ) {close(s);return 0;}
 //if (setsockopt(s,SOL_IP,IP_HDRINCL,(const void *)&one,sizeof(i32)) == -1) return 0;
-if (setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&t,sizeof(t)) == -1) {close(s);return 0;}
+     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
+        &t, sizeof(struct timeval));
+     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
+        &t, sizeof(struct timeval));
 return s;
 }
 
