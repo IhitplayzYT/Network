@@ -4,7 +4,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdoslib/stdoslib.h>
 #include <unistd.h>
 
 i16 global_id;

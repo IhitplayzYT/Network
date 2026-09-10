@@ -1,5 +1,5 @@
 flags=-O2 -Wall -g -Wextra -pedantic -std=c2x -I.
-ldflags= -lstdoslib
+ldflags=
 objects = Networks.o helper.o constructor.o
 .PHONY: all clean cl run
 

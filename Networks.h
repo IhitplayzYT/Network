@@ -6,10 +6,11 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
-#include <stdoslib/stdoslib.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <sys/types.h>
+#include <stdbool.h>
+#include <stdarg.h>
 /*Includes*/
 
 /* Typedefinations */
@@ -50,6 +51,20 @@ i8*: to_macs \
 #define TIMEOUT (1)
 #define sendping(src,dst,mssg,len) _sendping((i8*)src,(i8*)dst,(i8*)mssg,(i16)len)
 #define sendether () _sendether()
+
+/* stdoslib replacement macros */
+#define strcomp strcmp
+#define len strlen
+#define stoi atoi
+#define zero(ptr,size) memset(ptr,0,size)
+#define memcopy(dest,src,size) memcpy(dest,src,size)
+#define copy(dest,src,size) memcpy(dest,src,size)
+#define strncopy(dest,src,size) strncpy(dest,src,size)
+#define endian(x) ntohs(x)
+#define endian16(x) htons(x)
+#define boolean bool
+#define true 1
+#define false 0
 /* MACROS */
 
 /* Definations */
@@ -155,6 +170,11 @@ i8 *data;
 
 typedef struct s_bytestr Bytestr;
 
+struct s_Tok_ret {
+    i8 **ret;
+    i16 n;
+};
+
 /* Function Signatures */
 int main(int,char**);
 public Bytestr * eval_icmp(Icmp*);
@@ -197,4 +217,6 @@ public Bytestr * eval_raw(i8 *);
 public i8 str2hex(i8 * );
 public i16 iftoidx(i8 *);
 i8 hexval(char c);
+i16 freq(i8*, i8);
+struct s_Tok_ret * tokenise(i8*, char);
 /* Function Signatures */

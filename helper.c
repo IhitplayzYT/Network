@@ -5,7 +5,6 @@
 #include <linux/if_packet.h>
 #include <net/ethernet.h>
 #include <stdio.h>
-#include <stdoslib/stdoslib.h>
 #include <sys/socket.h>
 #include "Networks.h"
 extern int seq,id;
@@ -682,4 +681,46 @@ public i8 str2hex(i8 *str)
     
     if (high == 255 || low == 255) return 255;
     return (high << 4) | low;
+}
+
+i16 freq(i8* str, i8 c) {
+    i16 count = 0;
+    for (int i = 0; str[i]; i++) {
+        if (str[i] == c) count++;
+    }
+    return count;
+}
+
+struct s_Tok_ret * tokenise(i8* str, char delim) {
+    i16 count = freq(str, delim) + 1;
+    struct s_Tok_ret *tokens = (struct s_Tok_ret*)malloc(sizeof(struct s_Tok_ret));
+    if (!tokens) return NULL;
+    tokens->ret = (i8**)malloc(count * sizeof(i8*));
+    if (!tokens->ret) {
+        free(tokens);
+        return NULL;
+    }
+    tokens->n = count;
+    
+    i8 *copy = (i8*)malloc(len(str) + 1);
+    if (!copy) {
+        free(tokens->ret);
+        free(tokens);
+        return NULL;
+    }
+    strncopy(copy, str, len(str) + 1);
+    
+    i16 i = 0;
+    char *token = strtok((char*)copy, &delim);
+    while (token != NULL && i < count) {
+        tokens->ret[i] = (i8*)malloc(strlen(token) + 1);
+        if (tokens->ret[i]) {
+            strncopy(tokens->ret[i], (i8*)token, strlen(token) + 1);
+        }
+        token = strtok(NULL, &delim);
+        i++;
+    }
+    
+    free(copy);
+    return tokens;
 }
